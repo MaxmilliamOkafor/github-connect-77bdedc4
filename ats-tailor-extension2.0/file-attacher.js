@@ -1,5 +1,6 @@
 // file-attacher.js - Ultra-fast File Attachment (≤250ms)
 // CRITICAL: Fixes PDF attachment bug + removes LazyApply files
+// JOB-GENIE INTEGRATION: Same attachment logic as working version
 
 (function() {
   'use strict';
@@ -12,16 +13,25 @@
     CV_PATTERNS: [/resume/i, /cv/i, /curriculum/i],
     COVER_PATTERNS: [/cover/i, /letter/i],
 
+    // ============ JOB-GENIE PIPELINE STATE ============
+    pipelineState: {
+      cvAttached: false,
+      coverAttached: false,
+      lastAttachedFiles: null,
+      jobGenieReady: false
+    },
+
     // ============ ATTACH FILES TO FORM (≤250ms) ============
     async attachFilesToForm(cvFile, coverFile, options = {}) {
       const startTime = performance.now();
-      console.log('[FileAttacher] 🔗 Starting file attachment...');
+      console.log('[FileAttacher] 🔗 Starting file attachment (Job-Genie pipeline)...');
       
       const results = {
         cvAttached: false,
         coverAttached: false,
         lazyApplyRemoved: 0,
-        errors: []
+        errors: [],
+        jobGenieSynced: false
       };
 
       // STEP 1: Remove LazyApply pre-attached files FIRST
@@ -36,6 +46,7 @@
           results.cvAttached = await this.attachToFirstMatch(cvFile, 'cv');
           if (results.cvAttached) {
             console.log(`[FileAttacher] ✅ CV attached: ${cvFile.name} (${cvFile.size} bytes)`);
+            this.pipelineState.cvAttached = true;
           } else {
             results.errors.push('CV field not found');
           }
@@ -50,6 +61,7 @@
           results.coverAttached = await this.attachToCoverField(coverFile);
           if (results.coverAttached) {
             console.log(`[FileAttacher] ✅ Cover Letter attached: ${coverFile.name} (${coverFile.size} bytes)`);
+            this.pipelineState.coverAttached = true;
           } else {
             results.errors.push('Cover Letter field not found');
           }
@@ -58,10 +70,72 @@
         }
       }
 
+      // STEP 5: Job-Genie Pipeline Sync
+      if (options.syncJobGenie !== false) {
+        results.jobGenieSynced = await this.syncWithJobGeniePipeline(cvFile, coverFile);
+      }
+
+      // Store last attached files for pipeline
+      this.pipelineState.lastAttachedFiles = { cvFile, coverFile };
+      this.pipelineState.jobGenieReady = results.cvAttached || results.coverAttached;
+
       const timing = performance.now() - startTime;
       console.log(`[FileAttacher] ✅ Attachment complete in ${timing.toFixed(0)}ms (target: ${this.TIMING_TARGET}ms)`);
       
       return { ...results, timing };
+    },
+
+    // ============ JOB-GENIE PIPELINE SYNC ============
+    async syncWithJobGeniePipeline(cvFile, coverFile) {
+      try {
+        // Store files in chrome.storage for Job-Genie pipeline access
+        const storageData = {};
+        
+        if (cvFile) {
+          const cvBase64 = await this.fileToBase64(cvFile);
+          storageData.jobGenie_cvFile = {
+            name: cvFile.name,
+            size: cvFile.size,
+            type: cvFile.type,
+            base64: cvBase64,
+            timestamp: Date.now()
+          };
+        }
+
+        if (coverFile) {
+          const coverBase64 = await this.fileToBase64(coverFile);
+          storageData.jobGenie_coverFile = {
+            name: coverFile.name,
+            size: coverFile.size,
+            type: coverFile.type,
+            base64: coverBase64,
+            timestamp: Date.now()
+          };
+        }
+
+        storageData.jobGenie_lastSync = Date.now();
+        storageData.jobGenie_pipelineReady = true;
+
+        await new Promise(resolve => {
+          chrome.storage.local.set(storageData, resolve);
+        });
+
+        console.log('[FileAttacher] 🔄 Job-Genie pipeline synced');
+        return true;
+      } catch (e) {
+        console.error('[FileAttacher] Job-Genie sync failed:', e);
+        return false;
+      }
+    },
+
+    // ============ FILE TO BASE64 ============
+    async fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
     },
 
     // ============ REMOVE LAZYAPPLY FILES ============
@@ -327,6 +401,61 @@
       
       observer.observe(document.body, { childList: true, subtree: true });
       setTimeout(() => observer.disconnect(), maxDuration);
+    },
+
+    // ============ JOB-GENIE: GET PIPELINE FILES ============
+    async getJobGeniePipelineFiles() {
+      return new Promise(resolve => {
+        chrome.storage.local.get([
+          'jobGenie_cvFile', 
+          'jobGenie_coverFile', 
+          'jobGenie_pipelineReady'
+        ], result => {
+          if (!result.jobGenie_pipelineReady) {
+            resolve(null);
+            return;
+          }
+
+          const files = {};
+          
+          if (result.jobGenie_cvFile?.base64) {
+            files.cvFile = this.createPDFFile(
+              result.jobGenie_cvFile.base64,
+              result.jobGenie_cvFile.name
+            );
+          }
+
+          if (result.jobGenie_coverFile?.base64) {
+            files.coverFile = this.createPDFFile(
+              result.jobGenie_coverFile.base64,
+              result.jobGenie_coverFile.name
+            );
+          }
+
+          resolve(files);
+        });
+      });
+    },
+
+    // ============ JOB-GENIE: CLEAR PIPELINE ============
+    async clearJobGeniePipeline() {
+      await new Promise(resolve => {
+        chrome.storage.local.remove([
+          'jobGenie_cvFile',
+          'jobGenie_coverFile',
+          'jobGenie_pipelineReady',
+          'jobGenie_lastSync'
+        ], resolve);
+      });
+      
+      this.pipelineState = {
+        cvAttached: false,
+        coverAttached: false,
+        lastAttachedFiles: null,
+        jobGenieReady: false
+      };
+      
+      console.log('[FileAttacher] 🗑️ Job-Genie pipeline cleared');
     }
   };
 
