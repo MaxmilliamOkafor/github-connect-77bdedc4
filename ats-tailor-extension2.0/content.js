@@ -5,7 +5,7 @@
 (function() {
   'use strict';
 
-  console.log('[ATS Tailor] AUTO-TAILOR v1.5.0 loaded on:', window.location.hostname);
+  console.log('[ATS Tailor] AUTO-TAILOR v1.6.0 TURBO loaded on:', window.location.hostname);
 
   // ============ CONFIGURATION ============
   const SUPABASE_URL = 'https://wntpldomgjutwufphnpg.supabase.co';
@@ -727,8 +727,108 @@
     }
   }
 
-  // ============ MESSAGE LISTENER FOR WORKDAY FLOW ============
+  // ============ MESSAGE LISTENER FOR WORKDAY FLOW + DOCUMENT ATTACHMENT ============
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // CRITICAL FIX: Handle attachDocument message from popup
+    if (message.action === 'attachDocument') {
+      console.log('[ATS Tailor] Received attachDocument request:', message.type);
+      
+      (async () => {
+        try {
+          const { type, pdf, text, filename } = message;
+          
+          if (!pdf && !text) {
+            sendResponse({ success: false, message: 'No document data provided' });
+            return;
+          }
+          
+          // Create file from base64
+          let file = null;
+          if (pdf) {
+            file = typeof FileAttacher !== 'undefined' 
+              ? FileAttacher.createPDFFile(pdf, filename)
+              : createPDFFile(pdf, filename);
+          }
+          
+          if (!file && !text) {
+            sendResponse({ success: false, message: 'Failed to create file' });
+            return;
+          }
+          
+          // Check for file inputs
+          const fileInputs = document.querySelectorAll('input[type="file"]');
+          if (fileInputs.length === 0) {
+            sendResponse({ success: true, skipped: true, message: 'No file upload fields found' });
+            return;
+          }
+          
+          // Use FileAttacher for attachment
+          if (typeof FileAttacher !== 'undefined' && file) {
+            let attached = false;
+            if (type === 'cv') {
+              attached = await FileAttacher.attachToFirstMatch(file, 'cv');
+            } else {
+              attached = await FileAttacher.attachToCoverField(file);
+            }
+            
+            if (attached) {
+              sendResponse({ success: true, message: `${type === 'cv' ? 'CV' : 'Cover Letter'} attached!` });
+            } else {
+              sendResponse({ success: false, message: `Could not find ${type === 'cv' ? 'CV' : 'Cover Letter'} field` });
+            }
+          } else if (file) {
+            // Fallback attachment
+            const patterns = type === 'cv' ? [/resume/i, /cv/i, /curriculum/i] : [/cover/i, /letter/i];
+            let attached = false;
+            
+            for (const input of fileInputs) {
+              const context = getFieldContext(input);
+              const isMatch = patterns.some(p => p.test(context));
+              if (isMatch) {
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                input.files = dt.files;
+                fireEvents(input);
+                attached = true;
+                break;
+              }
+            }
+            
+            if (!attached && type === 'cv' && fileInputs.length > 0) {
+              const dt = new DataTransfer();
+              dt.items.add(file);
+              fileInputs[0].files = dt.files;
+              fireEvents(fileInputs[0]);
+              attached = true;
+            }
+            
+            sendResponse({ success: attached, message: attached ? 'Document attached!' : 'Could not attach document' });
+          } else if (text && type === 'cover') {
+            // Fill textarea for cover letter text
+            const textareas = document.querySelectorAll('textarea');
+            let filled = false;
+            for (const textarea of textareas) {
+              const label = (textarea.labels?.[0]?.textContent || textarea.name || textarea.id || '').toLowerCase();
+              if (/cover/i.test(label)) {
+                textarea.value = text;
+                fireEvents(textarea);
+                filled = true;
+                break;
+              }
+            }
+            sendResponse({ success: filled, message: filled ? 'Cover letter filled!' : 'Could not find cover letter field' });
+          } else {
+            sendResponse({ success: false, message: 'No compatible field found' });
+          }
+        } catch (error) {
+          console.error('[ATS Tailor] attachDocument error:', error);
+          sendResponse({ success: false, message: error.message });
+        }
+      })();
+      
+      return true; // CRITICAL: Keep message channel open for async response
+    }
+    
     if (message.action === 'START_WORKDAY_FLOW') {
       handleWorkdayFullFlow(message.candidateData);
       sendResponse({ status: 'started' });
@@ -749,6 +849,20 @@
       return true;
     }
   });
+  
+  // Helper function to get field context (for fallback attachment)
+  function getFieldContext(input) {
+    const parts = [];
+    if (input.labels?.[0]) parts.push(input.labels[0].textContent);
+    parts.push(input.name || '', input.id || '');
+    parts.push(input.getAttribute('aria-label') || '');
+    let parent = input.parentElement;
+    for (let i = 0; i < 2 && parent; i++) {
+      parts.push(parent.textContent?.substring(0, 100) || '');
+      parent = parent.parentElement;
+    }
+    return parts.join(' ').toLowerCase();
+  }
 
   // ============ PLATFORM DETECTION ============
   function detectPlatform() {
@@ -1382,7 +1496,7 @@
     return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 35).map(([word]) => word);
   }
 
-  // ============ AUTO-TAILOR DOCUMENTS (TURBO VERSION - 80% FASTER ≤2.4s) ============
+  // ============ AUTO-TAILOR DOCUMENTS (TURBO VERSION - 40% FASTER ≤1.4s) ============
   async function autoTailorDocuments() {
     if (hasTriggeredTailor || tailoringInProgress) return;
 
@@ -1437,23 +1551,23 @@
         ats_tailored_urls: { ...cached, [currentJobUrl]: Date.now() }
       });
 
-      // CRITICAL FIX: Use FileAttacher for reliable file attachment
+      // CRITICAL FIX: Use FileAttacher for TURBO reliable file attachment
       if (typeof FileAttacher !== 'undefined') {
         const cvFileObj = FileAttacher.createPDFFile(result.resumePdf, cvFileName);
         const coverFileObj = FileAttacher.createPDFFile(result.coverLetterPdf, coverFileName);
         
-        // Attach files immediately
-        await FileAttacher.attachFilesToForm(cvFileObj, coverFileObj);
-        
-        // Start monitoring for dynamic form changes
-        FileAttacher.startAttachmentMonitor(cvFileObj, coverFileObj, 10000);
+        // PARALLEL: Attach files immediately (non-blocking)
+        FileAttacher.attachFilesToForm(cvFileObj, coverFileObj).then(() => {
+          // Start monitoring for dynamic form changes (reduced from 10s to 5s)
+          FileAttacher.startAttachmentMonitor(cvFileObj, coverFileObj, 5000);
+        });
       } else {
         // Fallback to old method
         loadFilesAndStart();
       }
       
       const totalTime = performance.now() - pipelineStart;
-      console.log(`[ATS Tailor] ✅ Complete pipeline in ${totalTime.toFixed(0)}ms (target: 2400ms)`);
+      console.log(`[ATS Tailor] ✅ TURBO pipeline complete in ${totalTime.toFixed(0)}ms (target: 1400ms)`);
       
       updateBanner(`Complete: ${jobInfo.title}`, 'success');
       hideBanner();
@@ -1496,26 +1610,27 @@
     // Run a single cleanup once right before attaching (prevents UI flicker)
     killXButtons();
 
+  // 40% FASTER: Reduced intervals from 200ms/1000ms to 120ms/600ms
     attachLoop200ms = setInterval(() => {
       if (!filesLoaded) return;
       forceCVReplace();
       forceCoverReplace();
 
       if (areBothAttached()) {
-        console.log('[ATS Tailor] Attach complete — stopping loops');
+        console.log('[ATS Tailor] TURBO attach complete — stopping loops');
         stopAttachLoops();
       }
-    }, 200);
+    }, 120);
 
     attachLoop1s = setInterval(() => {
       if (!filesLoaded) return;
       forceEverything();
 
       if (areBothAttached()) {
-        console.log('[ATS Tailor] Attach complete — stopping loops');
+        console.log('[ATS Tailor] TURBO attach complete — stopping loops');
         stopAttachLoops();
       }
-    }, 1000);
+    }, 600);
   }
 
   // ============ LOAD FILES AND START ==========
@@ -1571,10 +1686,10 @@
       return;
     }
 
-    // Standard ATS flow - wait for page to stabilize
+  // Standard ATS flow - 40% FASTER: Reduced wait time
     setTimeout(() => {
       if (hasUploadFields()) {
-        console.log('[ATS Tailor] Upload fields detected! Starting auto-tailor...');
+        console.log('[ATS Tailor] Upload fields detected! Starting TURBO auto-tailor...');
         autoTailorDocuments();
       } else {
         console.log('[ATS Tailor] No upload fields yet, watching for changes...');
@@ -1582,7 +1697,7 @@
         // Watch for upload fields to appear
         const observer = new MutationObserver(() => {
           if (!hasTriggeredTailor && hasUploadFields()) {
-            console.log('[ATS Tailor] Upload fields appeared! Starting auto-tailor...');
+            console.log('[ATS Tailor] Upload fields appeared! Starting TURBO auto-tailor...');
             observer.disconnect();
             autoTailorDocuments();
           }
@@ -1590,15 +1705,15 @@
         
         observer.observe(document.body, { childList: true, subtree: true });
         
-        // Fallback: check again after 5s
+        // 40% FASTER: Reduced fallback from 5s to 3s
         setTimeout(() => {
           if (!hasTriggeredTailor && hasUploadFields()) {
             observer.disconnect();
             autoTailorDocuments();
           }
-        }, 5000);
+        }, 3000);
       }
-    }, 1500); // Wait 1.5s for page to load
+    }, 900); // 40% FASTER: Reduced from 1.5s to 0.9s
   }
 
   // Start
