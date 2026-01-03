@@ -515,6 +515,7 @@
 
   // ============ 5.0 FEATURE: EXTRACT KEYWORDS WITH TURBO PIPELINE ============
   async function extractKeywordsLocally(jobDescription) {
+    // Priority 1: TurboPipeline (fastest)
     if (typeof TurboPipeline !== 'undefined' && TurboPipeline.turboExtractKeywords) {
       return await TurboPipeline.turboExtractKeywords(jobDescription, { 
         jobUrl: currentJobUrl,
@@ -522,21 +523,47 @@
       });
     }
 
+    // Priority 2: UniversalKeywordStrategy
     if (typeof UniversalKeywordStrategy !== 'undefined') {
       return UniversalKeywordStrategy.extractAndClassifyKeywords(jobDescription, 35);
     }
 
+    // Priority 3: MandatoryKeywords
     if (typeof MandatoryKeywords !== 'undefined') {
       const mandatory = MandatoryKeywords.extractMandatoryFromJD(jobDescription);
       return { all: mandatory, highPriority: mandatory.slice(0, 15), mediumPriority: [], lowPriority: [] };
     }
 
+    // Fallback: Basic extraction
     const stopWords = new Set(['a','an','the','and','or','but','in','on','at','to','for','of','with','by','from','this','that','you','your','we','our','they','their','work','working','job','position','role']);
     const words = jobDescription.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length >= 3 && !stopWords.has(w));
     const freq = new Map();
     words.forEach(w => freq.set(w, (freq.get(w) || 0) + 1));
     const sorted = [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 25).map(([w]) => w);
     return { all: sorted, highPriority: sorted.slice(0, 10), mediumPriority: sorted.slice(10, 20), lowPriority: sorted.slice(20) };
+  }
+
+  // ============ CV INJECTOR INTEGRATION (Python-style injection) ============
+  async function injectKeywordsWithCVInjector(cvText, keywords, options = {}) {
+    if (typeof CVInjector === 'undefined') {
+      console.log('[ATS Tailor] CVInjector not available, using fallback');
+      return null;
+    }
+
+    try {
+      const result = await CVInjector.fullInjectionPipeline(cvText, keywords, options);
+      if (result.success) {
+        console.log('[ATS Tailor] CVInjector pipeline complete:', {
+          matchScore: result.matchScore,
+          skillsAdded: result.stats.skillsAdded,
+          bulletsModified: result.stats.bulletsModified
+        });
+        return result;
+      }
+    } catch (e) {
+      console.error('[ATS Tailor] CVInjector error:', e);
+    }
+    return null;
   }
 
   // ============ AUTO-TRIGGER KEYWORD EXTRACTION ============
@@ -660,6 +687,20 @@
       const localKeywords = await extractKeywordsLocally(jobInfo.description);
       console.log('[ATS Tailor] Extracted keywords:', localKeywords.all?.slice(0, 10));
 
+      // ============ TRY LOCAL CV INJECTOR FIRST (Python-style injection) ============
+      let localInjectionResult = null;
+      const storedCV = await new Promise(resolve => {
+        chrome.storage.local.get(['ats_base_cv_text'], r => resolve(r.ats_base_cv_text));
+      });
+
+      if (storedCV && typeof CVInjector !== 'undefined') {
+        updateBanner('Injecting keywords locally (ATS optimized)...', 'working');
+        localInjectionResult = await injectKeywordsWithCVInjector(storedCV, localKeywords, {
+          locationOverride: jobInfo.location || p.city || undefined
+        });
+      }
+
+      // ============ CALL SUPABASE BACKEND FOR FULL TAILORING ============
       const response = await fetch(`${SUPABASE_URL}/functions/v1/tailor-application`, {
         method: 'POST',
         headers: {
@@ -673,6 +714,11 @@
           location: jobInfo.location,
           description: jobInfo.description,
           requirements: [],
+          localInjectionResult: localInjectionResult ? {
+            cvText: localInjectionResult.cvText,
+            matchScore: localInjectionResult.matchScore,
+            stats: localInjectionResult.stats
+          } : null,
           userProfile: {
             firstName: p.first_name || '',
             lastName: p.last_name || '',
