@@ -1663,46 +1663,82 @@ class ATSTailor {
       // ALWAYS boost to 100% - no keywords left unmatched
       if (currentScore < 100 && keywords.all?.length > 0) {
         try {
-          let boostResult = await this.boostCVTo95Plus(
-            this.generatedDocuments.cv,
-            keywords,
-            (percent, text) => {
-              updateProgress(55 + (percent * 0.15), `Step 3/3: ${text}`);
-            }
-          );
-
-          // If still not 100%, use aggressive injection
-          if (boostResult.finalScore < 100 && boostResult.missingKeywords?.length > 0) {
-            console.log('[ATS Tailor] Applying final injection for remaining', boostResult.missingKeywords.length, 'keywords');
-            const finalInject = this.fastKeywordInjection(
-              boostResult.tailoredCV || this.generatedDocuments.cv,
-              keywords,
-              boostResult.missingKeywords
-            );
-            
-            if (finalInject.tailoredCV) {
-              boostResult.tailoredCV = finalInject.tailoredCV;
-              boostResult.injectedKeywords = [...(boostResult.injectedKeywords || []), ...finalInject.injectedKeywords];
+          // TRY CVINJECTOR FIRST (Python-style natural injection)
+          let cvInjectorUsed = false;
+          if (window.CVInjector && this.generatedDocuments.cv) {
+            try {
+              updateProgress(58, 'Step 3/3: Python-style keyword injection...');
+              const injectorResult = await window.CVInjector.fullInjectionPipeline(
+                this.generatedDocuments.cv,
+                keywords,
+                { locationOverride: this.currentJob?.location }
+              );
               
-              // Recalculate final score - should now be 100%
-              const finalMatch = this.calculateMatchScore(boostResult.tailoredCV, keywords);
-              boostResult.finalScore = finalMatch.matchScore;
-              boostResult.matchedKeywords = finalMatch.matchedKeywords;
-              boostResult.missingKeywords = finalMatch.missingKeywords;
+              if (injectorResult.success && injectorResult.matchScore > currentScore) {
+                console.log('[ATS Tailor] CVInjector boosted score:', injectorResult.matchScore + '%');
+                this.generatedDocuments.cv = injectorResult.tailoredCV;
+                const afterInject = this.calculateMatchScore(injectorResult.tailoredCV, keywords);
+                this.generatedDocuments.matchScore = afterInject.matchScore;
+                this.generatedDocuments.matchedKeywords = afterInject.matchedKeywords;
+                this.generatedDocuments.missingKeywords = afterInject.missingKeywords;
+                cvInjectorUsed = true;
+                
+                // Store base CV text for future local injections
+                await chrome.storage.local.set({ ats_base_cv_text: this.generatedDocuments.cv });
+              }
+            } catch (injectorError) {
+              console.warn('[ATS Tailor] CVInjector failed, using standard boost:', injectorError);
             }
           }
+          
+          // If CVInjector didn't achieve 100%, use standard boost
+          const postInjectorScore = this.generatedDocuments.matchScore || currentScore;
+          if (postInjectorScore < 100) {
+            let boostResult = await this.boostCVTo95Plus(
+              this.generatedDocuments.cv,
+              keywords,
+              (percent, text) => {
+                updateProgress(55 + (percent * 0.15), `Step 3/3: ${text}`);
+              }
+            );
 
-          if (boostResult.tailoredCV) {
-            this.generatedDocuments.cv = boostResult.tailoredCV;
-            this.generatedDocuments.matchScore = boostResult.finalScore;
-            this.generatedDocuments.matchedKeywords = boostResult.matchedKeywords;
-            this.generatedDocuments.missingKeywords = boostResult.missingKeywords;
-            
-            // UPDATE UI: Show final 100% match score
+            // If still not 100%, use aggressive injection
+            if (boostResult.finalScore < 100 && boostResult.missingKeywords?.length > 0) {
+              console.log('[ATS Tailor] Applying final injection for remaining', boostResult.missingKeywords.length, 'keywords');
+              const finalInject = this.fastKeywordInjection(
+                boostResult.tailoredCV || this.generatedDocuments.cv,
+                keywords,
+                boostResult.missingKeywords
+              );
+              
+              if (finalInject.tailoredCV) {
+                boostResult.tailoredCV = finalInject.tailoredCV;
+                boostResult.injectedKeywords = [...(boostResult.injectedKeywords || []), ...finalInject.injectedKeywords];
+                
+                // Recalculate final score - should now be 100%
+                const finalMatch = this.calculateMatchScore(boostResult.tailoredCV, keywords);
+                boostResult.finalScore = finalMatch.matchScore;
+                boostResult.matchedKeywords = finalMatch.matchedKeywords;
+                boostResult.missingKeywords = finalMatch.missingKeywords;
+              }
+            }
+
+            if (boostResult.tailoredCV) {
+              this.generatedDocuments.cv = boostResult.tailoredCV;
+              this.generatedDocuments.matchScore = boostResult.finalScore;
+              this.generatedDocuments.matchedKeywords = boostResult.matchedKeywords;
+              this.generatedDocuments.missingKeywords = boostResult.missingKeywords;
+              
+              // UPDATE UI: Show final 100% match score
+              this.updateMatchAnalysisUI();
+              
+              console.log('[ATS Tailor] Step 3 - Final score:', boostResult.finalScore + '%', 
+                          'injected:', boostResult.injectedKeywords?.length || 0, 'keywords');
+            }
+          } else {
+            // CVInjector achieved 100%
             this.updateMatchAnalysisUI();
-            
-            console.log('[ATS Tailor] Step 3 - Final score:', boostResult.finalScore + '%', 
-                        'injected:', boostResult.injectedKeywords?.length || 0, 'keywords');
+            console.log('[ATS Tailor] Step 3 - CVInjector achieved 100% match');
           }
         } catch (boostError) {
           console.warn('[ATS Tailor] Boost failed, applying fallback injection:', boostError);
