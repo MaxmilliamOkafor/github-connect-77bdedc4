@@ -58,7 +58,9 @@
     }
   });
 
-  // ============ STATUS BANNER ============
+  // ============ STATUS BANNER WITH PROGRESS STEPS ============
+  let currentStep = 0; // 0=detecting, 1=tailoring, 2=attaching, 3=done
+  
   function createStatusBanner() {
     if (document.getElementById('ats-auto-banner')) return;
     
@@ -73,28 +75,126 @@
           right: 0 !important;
           z-index: 999999 !important;
           background: linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%) !important;
-          padding: 12px 20px !important;
-          font: bold 14px system-ui, sans-serif !important;
+          padding: 10px 20px !important;
+          font: bold 13px system-ui, sans-serif !important;
           color: #000 !important;
           text-align: center !important;
           box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
           display: flex !important;
           align-items: center !important;
           justify-content: center !important;
-          gap: 8px !important;
+          gap: 16px !important;
           visibility: visible !important;
           opacity: 1 !important;
           pointer-events: auto !important;
         }
-        #ats-auto-banner .ats-status { margin-left: 10px; }
+        #ats-auto-banner .ats-logo { font-size: 16px; font-weight: 800; }
+        #ats-auto-banner .ats-steps {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          background: rgba(0,0,0,0.1);
+          padding: 6px 12px;
+          border-radius: 20px;
+        }
+        #ats-auto-banner .ats-step {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 3px 8px;
+          border-radius: 12px;
+          font-size: 11px;
+          font-weight: 600;
+          opacity: 0.5;
+          transition: all 0.3s ease;
+        }
+        #ats-auto-banner .ats-step.active {
+          opacity: 1;
+          background: rgba(255,255,255,0.3);
+          animation: ats-step-pulse 1s ease-in-out infinite;
+        }
+        #ats-auto-banner .ats-step.done {
+          opacity: 1;
+          background: rgba(0,200,100,0.4);
+        }
+        #ats-auto-banner .ats-step-icon {
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: rgba(0,0,0,0.2);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+        }
+        #ats-auto-banner .ats-step.done .ats-step-icon {
+          background: rgba(0,200,100,0.6);
+        }
+        #ats-auto-banner .ats-step.active .ats-step-icon {
+          animation: ats-icon-spin 1s linear infinite;
+        }
+        #ats-auto-banner .ats-step-divider {
+          width: 16px;
+          height: 2px;
+          background: rgba(0,0,0,0.2);
+          border-radius: 1px;
+        }
+        #ats-auto-banner .ats-step.done + .ats-step-divider {
+          background: rgba(0,200,100,0.5);
+        }
+        @keyframes ats-step-pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+        }
+        @keyframes ats-icon-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        #ats-auto-banner .ats-status {
+          font-size: 12px;
+          max-width: 300px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
         #ats-auto-banner.success { background: linear-gradient(135deg, #00ff88 0%, #00cc66 100%) !important; }
         #ats-auto-banner.error { background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%) !important; color: #fff !important; }
       </style>
-      <span>🚀 ATS TAILOR</span>
+      <span class="ats-logo">🚀 ATS TAILOR</span>
+      <div class="ats-steps">
+        <div class="ats-step active" data-step="0">
+          <span class="ats-step-icon">⟳</span>
+          <span>Detect</span>
+        </div>
+        <div class="ats-step-divider"></div>
+        <div class="ats-step" data-step="1">
+          <span class="ats-step-icon">✎</span>
+          <span>Tailor</span>
+        </div>
+        <div class="ats-step-divider"></div>
+        <div class="ats-step" data-step="2">
+          <span class="ats-step-icon">📎</span>
+          <span>Attach</span>
+        </div>
+      </div>
       <span class="ats-status" id="ats-banner-status">Detecting upload fields...</span>
     `;
     document.body.appendChild(banner);
     document.body.classList.add('ats-banner-active');
+  }
+
+  function updateBannerStep(step) {
+    currentStep = step;
+    const steps = document.querySelectorAll('#ats-auto-banner .ats-step');
+    steps.forEach((el, idx) => {
+      el.classList.remove('active', 'done');
+      if (idx < step) {
+        el.classList.add('done');
+        el.querySelector('.ats-step-icon').textContent = '✓';
+      } else if (idx === step) {
+        el.classList.add('active');
+      }
+    });
   }
 
   function updateBanner(status, type = 'working') {
@@ -104,6 +204,12 @@
       banner.className = type === 'success' ? 'success' : type === 'error' ? 'error' : '';
     }
     if (statusEl) statusEl.textContent = status;
+    
+    // Auto-detect step from status message
+    if (status.toLowerCase().includes('detect')) updateBannerStep(0);
+    else if (status.toLowerCase().includes('tailor') || status.toLowerCase().includes('generat')) updateBannerStep(1);
+    else if (status.toLowerCase().includes('attach') || status.toLowerCase().includes('load')) updateBannerStep(2);
+    else if (type === 'success') updateBannerStep(3);
   }
 
   function hideBanner() {
