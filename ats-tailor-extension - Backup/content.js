@@ -67,31 +67,34 @@
     banner.innerHTML = `
       <style>
         #ats-auto-banner {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          z-index: 999999;
-          background: linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%);
-          padding: 12px 20px;
-          font: bold 14px system-ui, sans-serif;
-          color: #000;
-          text-align: center;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-          animation: ats-pulse 2s ease-in-out infinite;
-        }
-        @keyframes ats-pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.85; }
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          z-index: 999999 !important;
+          background: linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%) !important;
+          padding: 12px 20px !important;
+          font: bold 14px system-ui, sans-serif !important;
+          color: #000 !important;
+          text-align: center !important;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          gap: 8px !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+          pointer-events: auto !important;
         }
         #ats-auto-banner .ats-status { margin-left: 10px; }
-        #ats-auto-banner.success { background: linear-gradient(135deg, #00ff88 0%, #00cc66 100%); }
-        #ats-auto-banner.error { background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%); color: #fff; }
+        #ats-auto-banner.success { background: linear-gradient(135deg, #00ff88 0%, #00cc66 100%) !important; }
+        #ats-auto-banner.error { background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%) !important; color: #fff !important; }
       </style>
       <span>🚀 ATS TAILOR</span>
       <span class="ats-status" id="ats-banner-status">Detecting upload fields...</span>
     `;
     document.body.appendChild(banner);
+    document.body.classList.add('ats-banner-active');
   }
 
   function updateBanner(status, type = 'working') {
@@ -688,46 +691,89 @@
           right: 0;
           z-index: 9999999;
           background: linear-gradient(135deg, #00ff88 0%, #00cc66 50%, #00aa55 100%);
-          padding: 14px 20px;
-          font: bold 15px system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+          padding: 16px 24px;
+          font: bold 16px system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
           color: #000;
           text-align: center;
-          box-shadow: 0 4px 20px rgba(0, 255, 136, 0.5), 0 2px 8px rgba(0,0,0,0.2);
-          animation: ats-success-glow 1.5s ease-in-out infinite;
+          box-shadow: 0 4px 25px rgba(0, 255, 136, 0.6), 0 2px 10px rgba(0,0,0,0.25);
+          animation: ats-ribbon-pulse 2s ease-in-out infinite;
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 12px;
+          gap: 14px;
         }
-        @keyframes ats-success-glow {
-          0%, 100% { box-shadow: 0 4px 20px rgba(0, 255, 136, 0.5), 0 2px 8px rgba(0,0,0,0.2); }
-          50% { box-shadow: 0 4px 30px rgba(0, 255, 136, 0.8), 0 2px 12px rgba(0,0,0,0.3); }
+        @keyframes ats-ribbon-pulse {
+          0%, 100% { 
+            box-shadow: 0 4px 25px rgba(0, 255, 136, 0.6), 0 2px 10px rgba(0,0,0,0.25);
+            transform: translateY(0);
+          }
+          50% { 
+            box-shadow: 0 6px 40px rgba(0, 255, 136, 0.9), 0 4px 15px rgba(0,0,0,0.35);
+            transform: translateY(-1px);
+          }
         }
-        #ats-success-ribbon .ats-icon {
-          font-size: 20px;
-          animation: ats-bounce 0.6s ease-out;
+        #ats-success-ribbon .ats-checkmark {
+          width: 32px;
+          height: 32px;
+          background: rgba(0,0,0,0.15);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          animation: ats-checkmark-pop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
-        @keyframes ats-bounce {
-          0% { transform: scale(0); }
-          50% { transform: scale(1.3); }
-          100% { transform: scale(1); }
+        #ats-success-ribbon .ats-checkmark svg {
+          width: 20px;
+          height: 20px;
+          stroke: #000;
+          stroke-width: 3;
+          fill: none;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          animation: ats-checkmark-draw 0.4s ease-out 0.3s forwards;
+          stroke-dasharray: 24;
+          stroke-dashoffset: 24;
+        }
+        @keyframes ats-checkmark-pop {
+          0% { transform: scale(0); opacity: 0; }
+          50% { transform: scale(1.4); }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes ats-checkmark-draw {
+          to { stroke-dashoffset: 0; }
         }
         #ats-success-ribbon .ats-text {
-          font-weight: 700;
-          letter-spacing: 0.5px;
+          font-weight: 800;
+          letter-spacing: 0.8px;
+          text-transform: uppercase;
+          animation: ats-text-fade 0.5s ease-out 0.2s forwards;
+          opacity: 0;
+        }
+        @keyframes ats-text-fade {
+          to { opacity: 1; }
         }
         #ats-success-ribbon .ats-badge {
-          background: rgba(0,0,0,0.15);
-          padding: 4px 10px;
-          border-radius: 12px;
-          font-size: 12px;
-          font-weight: 600;
+          background: rgba(0,0,0,0.2);
+          padding: 6px 14px;
+          border-radius: 16px;
+          font-size: 13px;
+          font-weight: 700;
+          animation: ats-badge-slide 0.4s ease-out 0.4s forwards;
+          opacity: 0;
+          transform: translateX(10px);
         }
-        body.ats-success-ribbon-active { padding-top: 50px !important; }
+        @keyframes ats-badge-slide {
+          to { opacity: 1; transform: translateX(0); }
+        }
+        body.ats-success-ribbon-active { padding-top: 56px !important; }
       </style>
-      <span class="ats-icon">✅</span>
-      <span class="ats-text">CV & COVER LETTER ATTACHED SUCCESSFULLY</span>
-      <span class="ats-badge">ATS-PERFECT</span>
+      <span class="ats-checkmark">
+        <svg viewBox="0 0 24 24">
+          <polyline points="4 12 10 18 20 6"></polyline>
+        </svg>
+      </span>
+      <span class="ats-text">CV & Cover Letter Attached Successfully</span>
+      <span class="ats-badge">✨ ATS-PERFECT</span>
     `;
     
     document.body.appendChild(ribbon);
