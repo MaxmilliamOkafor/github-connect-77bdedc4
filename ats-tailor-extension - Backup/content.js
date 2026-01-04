@@ -1,10 +1,11 @@
-// content.js - AUTO-TAILOR + ATTACH v1.4.0
+// content.js - AUTO-TAILOR + ATTACH v1.5.0 ULTRA BLAZING
 // Automatically triggers tailoring on ATS pages, then attaches files
+// 50% FASTER for LazyApply integration
 
 (function() {
   'use strict';
 
-  console.log('[ATS Tailor] AUTO-TAILOR v1.4.0 loaded on:', window.location.hostname);
+  console.log('[ATS Tailor] AUTO-TAILOR v1.5.0 ULTRA BLAZING loaded on:', window.location.hostname);
 
   // ============ CONFIGURATION ============
   const SUPABASE_URL = 'https://wntpldomgjutwufphnpg.supabase.co';
@@ -648,16 +649,16 @@
     }
   }
 
-  // ============ BLAZING REPLACE LOOP - 70% FASTER THAN ALL ============
+  // ============ ULTRA BLAZING REPLACE LOOP - 50% FASTER FOR LAZYAPPLY ============
   let attachLoopStarted = false;
+  let attachLoop4ms = null;
   let attachLoop8ms = null;
-  let attachLoop15ms = null;
 
   function stopAttachLoops() {
+    if (attachLoop4ms) clearInterval(attachLoop4ms);
     if (attachLoop8ms) clearInterval(attachLoop8ms);
-    if (attachLoop15ms) clearInterval(attachLoop15ms);
+    attachLoop4ms = null;
     attachLoop8ms = null;
-    attachLoop15ms = null;
     attachLoopStarted = false;
   }
 
@@ -671,32 +672,102 @@
     return cvOk && coverOk;
   }
 
+  // ============ SHOW GREEN SUCCESS RIBBON ============
+  function showSuccessRibbon() {
+    const existingRibbon = document.getElementById('ats-success-ribbon');
+    if (existingRibbon) return; // Already shown
+
+    const ribbon = document.createElement('div');
+    ribbon.id = 'ats-success-ribbon';
+    ribbon.innerHTML = `
+      <style>
+        #ats-success-ribbon {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          z-index: 9999999;
+          background: linear-gradient(135deg, #00ff88 0%, #00cc66 50%, #00aa55 100%);
+          padding: 14px 20px;
+          font: bold 15px system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+          color: #000;
+          text-align: center;
+          box-shadow: 0 4px 20px rgba(0, 255, 136, 0.5), 0 2px 8px rgba(0,0,0,0.2);
+          animation: ats-success-glow 1.5s ease-in-out infinite;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+        }
+        @keyframes ats-success-glow {
+          0%, 100% { box-shadow: 0 4px 20px rgba(0, 255, 136, 0.5), 0 2px 8px rgba(0,0,0,0.2); }
+          50% { box-shadow: 0 4px 30px rgba(0, 255, 136, 0.8), 0 2px 12px rgba(0,0,0,0.3); }
+        }
+        #ats-success-ribbon .ats-icon {
+          font-size: 20px;
+          animation: ats-bounce 0.6s ease-out;
+        }
+        @keyframes ats-bounce {
+          0% { transform: scale(0); }
+          50% { transform: scale(1.3); }
+          100% { transform: scale(1); }
+        }
+        #ats-success-ribbon .ats-text {
+          font-weight: 700;
+          letter-spacing: 0.5px;
+        }
+        #ats-success-ribbon .ats-badge {
+          background: rgba(0,0,0,0.15);
+          padding: 4px 10px;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+        body.ats-success-ribbon-active { padding-top: 50px !important; }
+      </style>
+      <span class="ats-icon">✅</span>
+      <span class="ats-text">CV & COVER LETTER ATTACHED SUCCESSFULLY</span>
+      <span class="ats-badge">ATS-PERFECT</span>
+    `;
+    
+    document.body.appendChild(ribbon);
+    document.body.classList.add('ats-success-ribbon-active');
+    
+    // Hide the orange banner if it exists
+    const orangeBanner = document.getElementById('ats-auto-banner');
+    if (orangeBanner) orangeBanner.style.display = 'none';
+    
+    console.log('[ATS Tailor] ✅ GREEN SUCCESS RIBBON displayed');
+  }
+
   function ultraFastReplace() {
     if (attachLoopStarted) return;
     attachLoopStarted = true;
 
     killXButtons();
 
-    // BLAZING: 8ms interval (120fps+)
-    attachLoop8ms = setInterval(() => {
+    // ULTRA BLAZING: 4ms interval (250fps+) - 50% faster than previous
+    attachLoop4ms = setInterval(() => {
       if (!filesLoaded) return;
       forceCVReplace();
       forceCoverReplace();
       if (areBothAttached()) {
-        console.log('[ATS Tailor] ⚡ BLAZING attach complete');
+        console.log('[ATS Tailor] ⚡⚡ ULTRA BLAZING attach complete');
+        showSuccessRibbon();
         stopAttachLoops();
       }
-    }, 8);
+    }, 4);
 
-    // BLAZING: 15ms interval for full force
-    attachLoop15ms = setInterval(() => {
+    // ULTRA BLAZING: 8ms interval for full force - 50% faster
+    attachLoop8ms = setInterval(() => {
       if (!filesLoaded) return;
       forceEverything();
       if (areBothAttached()) {
-        console.log('[ATS Tailor] ⚡ BLAZING attach complete');
+        console.log('[ATS Tailor] ⚡⚡ ULTRA BLAZING attach complete');
+        showSuccessRibbon();
         stopAttachLoops();
       }
-    }, 15);
+    }, 8);
   }
 
   // ============ LOAD FILES AND START ==========
@@ -780,15 +851,15 @@
         
         observer.observe(document.body, { childList: true, subtree: true });
         
-        // BLAZING: Fallback check after 60ms
+        // ULTRA BLAZING: Fallback check after 30ms - 50% faster
         setTimeout(() => {
           if (!hasTriggeredTailor && hasUploadFields()) {
             observer.disconnect();
             autoTailorDocuments();
           }
-        }, 60);
+        }, 30);
       }
-    }, 15); // BLAZING: 15ms trigger - 70% faster than all
+    }, 8); // ULTRA BLAZING: 8ms trigger - 50% faster for LazyApply
   }
 
   // Start
