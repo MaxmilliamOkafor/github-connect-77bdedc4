@@ -912,15 +912,15 @@ ${JSON.stringify(userProfile.achievements, null, 2)}
    - Skills: Prioritize JD keywords (list as: Python, AWS, React, etc. - NO years of experience)
    - Certifications
 
-2) CREATE COVER LETTER:
-   ${candidateName}
-   ${userProfile.email} | ${userProfile.phone}
+2) CREATE COVER LETTER (EXACT FORMAT - NO COMPANY NAME LINE):
+   ${candidateName.toUpperCase()}
+   ${userProfile.phone} | ${userProfile.email}
    
-   Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+   ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
    
-   Re: Application for ${jobTitle}
+   Re: ${jobTitle}
    
-   Dear Hiring Committee,
+   Dear Hiring Manager,
    
    [4 paragraphs: Hook showing genuine interest, Proof with specific metrics and achievements, Skills alignment with job requirements, Close with availability and enthusiasm]
    
