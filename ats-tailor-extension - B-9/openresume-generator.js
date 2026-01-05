@@ -817,7 +817,7 @@
       y += 8;
 
       // === SALUTATION ===
-      addText('Dear Hiring Committee,', false, font.body);
+      addText('Dear Hiring Manager,', false, font.body);
       y += 8;
 
       // === PARAGRAPH 1: Interest + Keywords ===
@@ -890,7 +890,7 @@
         '',
         `Re: ${jobTitle}`,
         '',
-        'Dear Hiring Committee,',
+        'Dear Hiring Manager,',
         '',
         `I am excited to apply for the ${jobTitle} position at ${company}. With experience in ${highPriority.slice(0, 2).join(' and ')}, I deliver measurable business impact through innovative solutions.`,
         '',
