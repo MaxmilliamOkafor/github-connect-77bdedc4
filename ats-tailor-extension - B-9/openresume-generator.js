@@ -803,16 +803,17 @@
       addCenteredText(name.toUpperCase(), true, font.name);
       y += 2;
       
-      const contactLine = [data.contact.location, data.contact.email, data.contact.phone].filter(Boolean).join(' | ');
+      // Phone | Email format (no location in cover letter header)
+      const contactLine = [data.contact.phone, data.contact.email].filter(Boolean).join(' | ');
       addCenteredText(contactLine, false, font.body);
       y += 16;
 
       // === DATE ===
       const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
       addText(today, false, font.body);
-      y += 8;
+      y += 12;
 
-      // === SUBJECT LINE ===
+      // === SUBJECT LINE (NO COMPANY NAME LINE) ===
       addText(`Re: ${jobTitle}`, true, font.body);
       y += 8;
 
@@ -882,9 +883,10 @@
       const keywordsArray = Array.isArray(keywords) ? keywords : (keywords?.all || keywords?.highPriority || []);
       const highPriority = Array.isArray(keywordsArray) ? keywordsArray.slice(0, 5) : [];
 
+      // Format: Name, Phone | Email, Date, Re: Title, Dear Hiring Manager (NO company name line)
       const lines = [
         name.toUpperCase(),
-        [data.contact.location, data.contact.email, data.contact.phone].filter(Boolean).join(' | '),
+        [data.contact.phone, data.contact.email].filter(Boolean).join(' | '),
         '',
         new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
         '',
