@@ -8,24 +8,16 @@
 </head>
 <body>
   <div class="container">
-    <!-- Premium Header with AI Provider Toggle -->
+    <!-- Premium Header -->
     <header class="header">
       <div class="logo">
         <img src="icons/icon48.png" alt="QuantumHire AI" class="logo-icon">
         <div class="logo-text">
           <h1>QuantumHire AI</h1>
-          <span class="tagline">ATS Optimisation Engine</span>
+          <span class="tagline">ATS Optimisation Engine v2.5</span>
         </div>
       </div>
       <div class="header-controls">
-        <div class="ai-provider-toggle" id="aiProviderToggle" title="Switch AI Provider">
-          <span class="provider-label provider-openai" id="providerOpenAI">OpenAI</span>
-          <label class="toggle-switch">
-            <input type="checkbox" id="aiProviderSwitch">
-            <span class="toggle-slider"></span>
-          </label>
-          <span class="provider-label provider-kimi active" id="providerKimi">Kimi K2</span>
-        </div>
         <div class="status-indicator" id="statusIndicator">
           <span class="status-dot"></span>
           <span class="status-text">Ready</span>
@@ -67,17 +59,40 @@
         <button id="logoutBtn" class="btn-link">Logout</button>
       </div>
 
-      <!-- AI Provider Status Banner -->
-      <div class="ai-status-banner" id="aiStatusBanner">
-        <div class="ai-status-left">
-          <span class="ai-icon" id="aiProviderIcon">🚀</span>
-          <div class="ai-status-info">
-            <span class="ai-provider-name" id="activeProviderName">Kimi K2</span>
-            <span class="ai-provider-model" id="activeProviderModel">kimi-k2-0711-preview</span>
-          </div>
+      <!-- AI Settings Panel (Replaces toggle) -->
+      <div class="ai-settings-panel" id="aiSettingsPanel">
+        <div class="ai-settings-header">
+          <span class="ai-settings-icon">🤖</span>
+          <span class="ai-settings-title">AI Provider Settings</span>
         </div>
-        <div class="ai-status-right">
-          <span class="ai-speed-badge" id="aiSpeedBadge">⚡ Fast</span>
+        <div class="ai-provider-options">
+          <label class="ai-provider-option" id="optionKimi">
+            <input type="radio" name="aiProvider" value="kimi" id="radioKimi">
+            <div class="provider-card">
+              <span class="provider-logo">🚀</span>
+              <div class="provider-info">
+                <span class="provider-name">Kimi K2</span>
+                <span class="provider-desc">kimi-k2-0711-preview • Fast</span>
+              </div>
+              <span class="provider-check">✓</span>
+            </div>
+          </label>
+          <label class="ai-provider-option" id="optionOpenAI">
+            <input type="radio" name="aiProvider" value="openai" id="radioOpenAI">
+            <div class="provider-card">
+              <span class="provider-logo">🧠</span>
+              <div class="provider-info">
+                <span class="provider-name">OpenAI</span>
+                <span class="provider-desc">gpt-4o-mini • Reliable</span>
+              </div>
+              <span class="provider-check">✓</span>
+            </div>
+          </label>
+        </div>
+        <div class="ai-settings-status">
+          <span class="status-label">Active:</span>
+          <span class="status-value" id="activeAIProvider">Kimi K2</span>
+          <span class="status-saved" id="aiSettingsSaved">✓ Saved</span>
         </div>
       </div>
 

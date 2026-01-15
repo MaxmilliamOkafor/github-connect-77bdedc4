@@ -132,14 +132,12 @@ class ATSTailor {
     }
   }
   
-  // ============ AI PROVIDER TOGGLE LOGIC (Kimi K2 / OpenAI) ============
+  // ============ AI PROVIDER SETTINGS (Persistent) ============
   
   async loadAIProviderSettings() {
     return new Promise((resolve) => {
-      // FAST LOAD (<50ms): Load AI provider preference immediately on popup open
-      chrome.storage.local.get(['ai_provider', 'kimi_enabled', 'openai_enabled'], (result) => {
-        // Default to Kimi K2 as primary (faster than OpenAI)
-        this.aiProvider = result.ai_provider || 'kimi';
+      chrome.storage.local.get(['ai_provider', 'ai_settings'], (result) => {
+        this.aiProvider = result.ai_provider || result.ai_settings?.provider || 'kimi';
         console.log('[ATS Tailor] AI Provider loaded:', this.aiProvider);
         resolve();
       });
@@ -147,56 +145,43 @@ class ATSTailor {
   }
   
   async saveAIProviderSettings() {
-    // PERSIST: Save immediately so setting survives popup close/reopen
-    await chrome.storage.local.set({ ai_provider: this.aiProvider });
+    await chrome.storage.local.set({ 
+      ai_provider: this.aiProvider,
+      ai_settings: { provider: this.aiProvider, savedAt: Date.now() }
+    });
     console.log('[ATS Tailor] AI Provider saved:', this.aiProvider);
+    
+    // Show saved indicator
+    const savedEl = document.getElementById('aiSettingsSaved');
+    if (savedEl) {
+      savedEl.classList.add('visible');
+      setTimeout(() => savedEl.classList.remove('visible'), 2000);
+    }
   }
   
   updateAIProviderUI() {
-    const toggle = document.getElementById('aiProviderToggle');
-    const kimiStatus = document.getElementById('kimiStatus');
-    const openaiStatus = document.getElementById('openaiStatus');
-    const providerLabel = document.getElementById('currentProviderLabel');
-    const modelLabel = document.getElementById('currentModelLabel');
+    const radioKimi = document.getElementById('radioKimi');
+    const radioOpenAI = document.getElementById('radioOpenAI');
+    const activeLabel = document.getElementById('activeAIProvider');
+    const optionKimi = document.getElementById('optionKimi');
+    const optionOpenAI = document.getElementById('optionOpenAI');
     
-    if (toggle) {
-      toggle.checked = this.aiProvider === 'openai';
-    }
+    if (radioKimi) radioKimi.checked = this.aiProvider === 'kimi';
+    if (radioOpenAI) radioOpenAI.checked = this.aiProvider === 'openai';
     
-    if (kimiStatus) {
-      kimiStatus.classList.toggle('active', this.aiProvider === 'kimi');
-    }
+    if (optionKimi) optionKimi.classList.toggle('selected', this.aiProvider === 'kimi');
+    if (optionOpenAI) optionOpenAI.classList.toggle('selected', this.aiProvider === 'openai');
     
-    if (openaiStatus) {
-      openaiStatus.classList.toggle('active', this.aiProvider === 'openai');
-    }
-    
-    if (providerLabel) {
-      providerLabel.textContent = this.aiProvider === 'kimi' ? 'Kimi K2' : 'OpenAI';
-    }
-    
-    if (modelLabel) {
-      modelLabel.textContent = this.aiProvider === 'kimi' ? 'kimi-k2-0711-preview' : 'gpt-4o-mini';
+    if (activeLabel) {
+      activeLabel.textContent = this.aiProvider === 'kimi' ? 'Kimi K2' : 'OpenAI';
     }
   }
   
-  toggleAIProvider() {
-    this.aiProvider = this.aiProvider === 'kimi' ? 'openai' : 'kimi';
-    // PERSIST IMMEDIATELY: Save on every toggle so it survives popup close
+  selectAIProvider(provider) {
+    this.aiProvider = provider;
     this.saveAIProviderSettings();
     this.updateAIProviderUI();
-    
-    // Notify content script of provider change for speed optimization
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, {
-          action: 'UPDATE_AI_PROVIDER',
-          provider: this.aiProvider
-        }).catch(() => {});
-      }
-    });
-    
-    this.showToast(`Switched to ${this.aiProvider === 'kimi' ? 'Kimi K2 (⚡ Faster)' : 'OpenAI'}`, 'success');
+    this.showToast(`AI Provider set to ${provider === 'kimi' ? 'Kimi K2' : 'OpenAI'}`, 'success');
   }
   
   // ============ WORKDAY MULTI-PAGE STATE PERSISTENCE ============
@@ -416,8 +401,9 @@ class ATSTailor {
     document.getElementById('downloadCvText')?.addEventListener('click', () => this.downloadTextVersion('cv'));
     document.getElementById('downloadCoverText')?.addEventListener('click', () => this.downloadTextVersion('cover'));
     
-    // AI Provider Toggle (Kimi K2 / OpenAI)
-    document.getElementById('aiProviderToggle')?.addEventListener('change', () => this.toggleAIProvider());
+    // AI Provider Selection (radio buttons - persistent)
+    document.getElementById('radioKimi')?.addEventListener('change', () => this.selectAIProvider('kimi'));
+    document.getElementById('radioOpenAI')?.addEventListener('change', () => this.selectAIProvider('openai'));
 
     // Bulk Apply Dashboard
     document.getElementById('openBulkApply')?.addEventListener('click', () => {
